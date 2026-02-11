@@ -14,7 +14,7 @@ st.markdown("""
     .away-win { color: #1c83e1; font-weight: bold; font-size: 24px; }
     .draw-win { color: #fffd8d; font-weight: bold; font-size: 24px; }
     </style>
-    """, unsafe_allow_stdio=True)
+    """, unsafe_allow_html=True)
 
 st.title("⚽ Football Studio Monitor")
 st.subheader("Resultados em Tempo Real")
@@ -72,3 +72,4 @@ if rodar_bot:
     asyncio.run(capturar_dados())
 else:
     st.info("Clique no botão à esquerda para começar a monitorar.")
+
