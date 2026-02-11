@@ -2,6 +2,9 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import asyncio
+import os
+os.system("playwright install chromium")
+
 from playwright.async_api import async_playwright
 
 # CONFIGURAÇÃO DA PÁGINA
@@ -143,6 +146,7 @@ async def monitorar():
 if iniciar:
     st.sidebar.success("Robô monitorando...")
     asyncio.run(monitorar())
+
 
 
 
