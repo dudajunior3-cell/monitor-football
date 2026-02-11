@@ -109,9 +109,7 @@ components.html(html_interface, height=600)
 
 async def monitorar():
     async with async_playwright() as p:
-         browser = await p.chromium.launch(
-            headless=True, 
-            args=["--no-sandbox", "--disable-setuid-sandbox"]
+        browser = await p.chromium.launch( headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"] )
         page = await browser.new_page()
         await page.goto(url_cassino)
         
@@ -145,6 +143,7 @@ async def monitorar():
 if iniciar:
     st.sidebar.success("Robô monitorando...")
     asyncio.run(monitorar())
+
 
 
 
