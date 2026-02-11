@@ -111,7 +111,7 @@ iniciar = st.sidebar.button("LIGAR PAINEL")
 components.html(html_interface, height=600)
 
 async def monitorar():
-    async with async_playwright() as p:
+        async with async_playwright() as p:
                # Configuração para rodar em servidores de nuvem (Streamlit Cloud)
         browser = await p.chromium.launch(
             headless=True, 
@@ -157,6 +157,7 @@ async def monitorar():
 if iniciar:
     st.sidebar.success("Robô monitorando...")
     asyncio.run(monitorar())
+
 
 
 
