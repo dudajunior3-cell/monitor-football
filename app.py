@@ -112,9 +112,20 @@ components.html(html_interface, height=600)
 
 async def monitorar():
     async with async_playwright() as p:
-        browser = await p.chromium.launch( headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"] )
-        page = await browser.new_page()
-        await page.goto(url_cassino)
+               # Configuração para rodar em servidores de nuvem (Streamlit Cloud)
+        browser = await p.chromium.launch(
+            headless=True, 
+            args=[
+                "--no-sandbox", 
+                "--disable-setuid-sandbox", 
+                "--disable-dev-shm-usage", 
+                "--disable-gpu",
+                "--no-first-run",
+                "--no-zygote",
+                "--single-process" # Importante para evitar o erro de fechamento imediato
+            ]
+        )
+
         
         ultimo_enviado = ""
         
@@ -146,6 +157,7 @@ async def monitorar():
 if iniciar:
     st.sidebar.success("Robô monitorando...")
     asyncio.run(monitorar())
+
 
 
 
