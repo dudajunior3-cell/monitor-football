@@ -111,28 +111,29 @@ iniciar = st.sidebar.button("LIGAR PAINEL")
 components.html(html_interface, height=600)
 
 async def monitorar():
-        async with async_playwright() as p:
-               # Configuração para rodar em servidores de nuvem (Streamlit Cloud)
+    async with async_playwright() as p:
         browser = await p.chromium.launch(
-            headless=True, 
+            headless=True,
             args=[
-                "--no-sandbox", 
-                "--disable-setuid-sandbox", 
-                "--disable-dev-shm-usage", 
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--no-first-run",
                 "--no-zygote",
-                "--single-process" # Importante para evitar o erro de fechamento imediato
+                "--single-process"
             ]
         )
-
+        page = await browser.new_page()
+        await page.goto(url_cassino)
         
         ultimo_enviado = ""
         
         while True:
             try:
-                # Localiza o iframe e o resultado
                 frame = page.frame_locator('iframe[src*="evolution"]').first
+                resultado_raw = await frame.locator('.stats-history-item').first.inner_text()
+
                 resultado_raw = await frame.locator('.stats-history-item').first.inner_text()
                 
                 # Converte o resultado para o formato do seu HTML (P, B ou T)
@@ -157,6 +158,7 @@ async def monitorar():
 if iniciar:
     st.sidebar.success("Robô monitorando...")
     asyncio.run(monitorar())
+
 
 
 
