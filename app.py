@@ -59,24 +59,35 @@ components.html(render_ui(st.session_state.historico, txt, cor, desc), height=25
 async def capturar_ao_vivo(url):
     async with async_playwright() as p:
         try:
+            # Iniciamos o navegador simulando um usuário real para não ser bloqueado
             browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0")
+            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0")
             page = await context.new_page()
+            
             await page.goto(url, timeout=60000, wait_until="networkidle")
             
-            # Varredura em todos os frames (Deep Scan)
+            # 1. A BRECHA: Procuramos o Iframe que contém 'evolution' ou 'betconstruct'
+            # No Football Studio, os resultados ficam na classe '.stats-history-item'
+            # ou dentro de elementos SVG que representam as cartas.
+            
             for frame in page.frames:
-                # Busca por elementos de histórico (bolinhas H, A ou T)
-                item = frame.locator('.stats-history-item, [class*="HistoryItem"], [class*="result"]').first
+                # Tentamos localizar o seletor universal de histórico da Evolution
+                item = frame.locator('.stats-history-item, [class*="HistoryItem"], [class*="result-item"]').first
+                
                 if await item.is_visible(timeout=5000):
                     texto = (await item.inner_text()).upper()
                     await browser.close()
-                    if any(x in texto for x in ["H", "HOME", "C", "CASA"]): return "P"
-                    if any(x in texto for x in ["A", "AWAY", "V", "VISITANTE"]): return "B"
+                    
+                    # Normalização para o seu sistema: Home (P), Away (B) ou Tie (T)
+                    if any(x in texto for x in ["H", "HOME", "CASA", "C"]): return "P"
+                    if any(x in texto for x in ["A", "AWAY", "VISITANTE", "V"]): return "B"
                     return "T"
+            
             await browser.close()
             return None
-        except: return None
+        except:
+            return None
+
 
 # --- LOOP DE ATUALIZAÇÃO ---
 if ligar:
@@ -93,3 +104,4 @@ if ligar:
     st.rerun()
 else:
     st.info("Ative o robô para iniciar a leitura dos dados ao vivo.")
+
