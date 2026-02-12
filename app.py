@@ -2,11 +2,21 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="PAINEL LIVE", layout="wide")
-st.title("⚽ Football Studio - Monitor de Sinais")
+st.title("⚽ Football Studio - Monitor PRO")
 
-# Aqui o app apenas lê um arquivo que o seu PC vai atualizar
+# O painel lê um arquivo que você atualizará do seu PC
 try:
-    df = pd.read_csv("historico.csv")
-    st.write(df.tail(10)) # Mostra os últimos 10 resultados
+    # Vamos usar uma URL direta do GitHub para os dados
+    URL_DADOS = "https://raw.githubusercontent.com"
+    df = pd.read_csv(URL_DADOS)
+    
+    # Exibe o sinal baseado no último resultado
+    ultimo = df['resultado'].iloc[-1]
+    cor = "#2563eb" if ultimo == 'H' else "#dc2626" if ultimo == 'A' else "#16a34a"
+    st.markdown(f"<div style='background:{cor}; padding:30px; border-radius:15px; text-align:center; color:white;'><h1>ENTRADA: {ultimo}</h1></div>", unsafe_allow_html=True)
+    
+    st.subheader("🕒 Histórico Recente")
+    st.table(df.tail(10))
 except:
     st.info("Aguardando dados do robô local...")
+
