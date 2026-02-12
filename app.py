@@ -4,7 +4,7 @@ import asyncio
 import os
 import time
 
-# 1. AUTO-INSTALAÇÃO DO NAVEGADOR
+# 1. INSTALAÇÃO AUTOMÁTICA DO NAVEGADOR
 if "play_ready" not in st.session_state:
     os.system("playwright install chromium")
     st.session_state.play_ready = True
@@ -12,7 +12,7 @@ if "play_ready" not in st.session_state:
 from playwright.async_api import async_playwright
 
 # 2. CONFIGURAÇÃO VISUAL
-st.set_page_config(page_title="FOOTBALL STUDIO - LIVE PRO 2026", layout="wide")
+st.set_page_config(page_title="PRO MONITOR - FOOTBALL STUDIO", layout="wide")
 
 if 'historico' not in st.session_state: st.session_state.historico = []
 if 'ultimo' not in st.session_state: st.session_state.ultimo = ""
@@ -23,11 +23,13 @@ def analisar_sinal(hist):
         return "SINCRONIZANDO...", "#1e293b", "Aguardando coletar 3 rodadas..."
     
     u = hist[-3:]
+    # Estratégia de Quebra de Sequência
     if all(x == 'P' for x in u): return "ENTRAR EM AWAY (B)", "#dc2626", "Sequência de 3 Home! Entre na quebra."
     if all(x == 'B' for x in u): return "ENTRAR EM HOME (P)", "#2563eb", "Sequência de 3 Away! Entre na quebra."
+    
     return "MONITORANDO...", "#1e293b", "Aguardando padrão confirmado..."
 
-# --- INTERFACE VISUAL ---
+# --- INTERFACE VISUAL PREMIUM ---
 def render_ui(hist, txt, cor, desc):
     js_h = str(hist)
     return f"""
@@ -39,7 +41,7 @@ def render_ui(hist, txt, cor, desc):
         </div>
         <div style="background:#1e293b; padding:20px; border-radius:12px; text-align:center;">
             <h2 style="margin:0; font-size:1rem;">🕒 ÚLTIMOS RESULTADOS</h2>
-            <div id="h" style="margin-top:10px; font-weight:bold;"></div>
+            <div id="h" style="margin-top:10px;"></div>
         </div>
         <script>
             const d = {js_h}.slice(-10).reverse();
@@ -48,43 +50,51 @@ def render_ui(hist, txt, cor, desc):
     </div>
     """
 
+# --- SIDEBAR DE COMANDO ---
 st.sidebar.title("🤖 COMANDO DO ROBÔ")
-url_input = st.sidebar.text_input("Link da Mesa (Evolution):", st.session_state.get('url', 'COLE_O_LINK_AQUI'))
+# Link direto que você enviou (Certifique-se de colar o link INTEIRO no app)
+link_direto = "https://betconstructlatam.evo-games.com"
+url_input = st.sidebar.text_input("Link da Mesa (Evolution):", link_direto)
 ligar = st.sidebar.toggle("LIGAR ANÁLISE AO VIVO")
 
+# Exibe o Painel
 txt, cor, desc = analisar_sinal(st.session_state.historico)
 components.html(render_ui(st.session_state.historico, txt, cor, desc), height=250)
 
-# --- CAPTURA DIRETA DO SERVIDOR ---
+# --- CAPTURA DIRETA DO SERVIDOR (MOTOR EVOLUTION R2) ---
 async def capturar_ao_vivo(url):
     async with async_playwright() as p:
         try:
-            # Launcher com argumentos para evitar detecção
+            # Launcher furtivo para não ser detectado pelo servidor
             browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
             context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0")
             page = await context.new_page()
             
             await page.goto(url, timeout=90000, wait_until="load")
             
-            # Seletor universal para as bolinhas de histórico da Evolution
+            # Seletor universal para as bolinhas de histórico da Evolution R2
             item = page.locator('.stats-history-item, [class*="HistoryItem"], [class*="result"]').first
             await item.wait_for(state="visible", timeout=30000)
             
             res_raw = (await item.inner_text()).upper()
             await browser.close()
             
+            # Converte para formato do painel
             if any(x in res_raw for x in ["H", "HOME", "C", "CASA"]): return "P"
             if any(x in res_raw for x in ["A", "AWAY", "V", "VISITANTE"]): return "B"
             return "T"
-        except: return None
+        except:
+            return None
 
+# --- LOOP DE ATUALIZAÇÃO ---
 if ligar and url_input:
     with st.spinner("Lendo mesa direto do servidor..."):
         res = asyncio.run(capturar_ao_vivo(url_input))
         if res and res != st.session_state.ultimo:
             st.session_state.historico.append(res)
             st.session_state.ultimo = res
-            st.rerun()
+            if len(st.session_state.historico) > 50: st.session_state.historico.pop(0)
+            st.rerun() # Atualiza os cards imediatamente
     
     time.sleep(5)
     st.rerun()
