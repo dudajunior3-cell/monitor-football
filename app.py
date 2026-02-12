@@ -7,10 +7,11 @@ from playwright.async_api import async_playwright
 # 1. CONFIGURAÇÃO DA INTERFACE
 st.set_page_config(page_title="FOOTBALL STUDIO - LIVE PRO", layout="wide")
 
+# Inicializa o histórico na sessão para não perder os dados
 if 'historico' not in st.session_state: st.session_state.historico = []
 if 'ultimo_res' not in st.session_state: st.session_state.ultimo_res = ""
 
-# --- LÓGICA DE ESTRATÉGIA ---
+# --- MOTOR DE ESTRATÉGIA ---
 def analisar_sinal(hist):
     if len(hist) < 3: 
         return "ANALISANDO MESA...", "#1e293b", "Aguardando coletar 3 rodadas..."
@@ -45,8 +46,9 @@ def render_ui(hist, txt, cor, desc):
 
 # --- SIDEBAR DE COMANDO ---
 st.sidebar.title("🤖 COMANDO DO ROBÔ")
-# Use o link completo que termina em gameNames=Football%20Studio
-url_input = st.sidebar.text_input("Link da Mesa:", "https://maxima.bet.br")
+# Link direto da mesa aberta (conforme seu print)
+link_mesa = "https://maxima.bet.br"
+url_input = st.sidebar.text_input("Link da Mesa:", link_mesa)
 ligar = st.sidebar.toggle("LIGAR ANÁLISE AO VIVO")
 
 # Exibe o Painel Central
@@ -62,9 +64,9 @@ async def capturar_ao_vivo(url):
             page = await context.new_page()
             await page.goto(url, timeout=60000, wait_until="networkidle")
             
-            # Busca profunda nos frames pelo histórico da Evolution
+            # Varredura em todos os frames (Deep Scan)
             for frame in page.frames:
-                # Procura as bolinhas de resultado (H, A ou T)
+                # Busca por elementos de histórico (bolinhas H, A ou T)
                 item = frame.locator('.stats-history-item, [class*="HistoryItem"], [class*="result"]').first
                 if await item.is_visible(timeout=5000):
                     texto = (await item.inner_text()).upper()
@@ -80,13 +82,14 @@ async def capturar_ao_vivo(url):
 if ligar:
     with st.spinner("Sincronizando com a mesa..."):
         res = asyncio.run(capturar_ao_vivo(url_input))
+        # Só atualiza a tela se o resultado for realmente novo
         if res and res != st.session_state.ultimo_res:
             st.session_state.historico.append(res)
             st.session_state.ultimo_res = res
             if len(st.session_state.historico) > 50: st.session_state.historico.pop(0)
-            st.rerun() # Atualiza a tela com o novo dado
+            st.rerun() # Comando CRÍTICO para atualizar os cards
     
-    time.sleep(5) # Aguarda 5 segundos para a próxima carta
+    time.sleep(5) # Espera 5 segundos para a próxima rodada
     st.rerun()
 else:
     st.info("Ative o robô para iniciar a leitura dos dados ao vivo.")
