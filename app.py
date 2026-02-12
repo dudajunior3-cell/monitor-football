@@ -19,19 +19,19 @@ def analisar_sinais(hist):
     
     ultimos = hist[-3:]
     
-    # 1. Estratégia de Quebra de Sequência (Gale)
+    # Estratégia de Quebra de Sequência
     if all(x == 'P' for x in ultimos): 
         return "ENTRAR EM AWAY (B)", "#dc2626", "Sequência de 3 Home detectada. Entre na QUEBRA."
     if all(x == 'B' for x in ultimos): 
         return "ENTRAR EM HOME (P)", "#2563eb", "Sequência de 3 Away detectada. Entre na QUEBRA."
     
-    # 2. Alerta de Empate (Vácuo)
+    # Alerta de Empate
     if 'T' not in hist[-12:]:
         return "POSSÍVEL EMPATE (T)", "#16a34a", "Mais de 12 rodadas sem empate. Probabilidade alta!"
 
-    return "MONITORANDO...", "#1e293b", "Padrão neutro. Aguarde um sinal de entrada confirmado."
+    return "MONITORANDO...", "#1e293b", "Padrão neutro. Aguarde sinal confirmado."
 
-# --- INTERFACE VISUAL PREMIUM ---
+# --- INTERFACE VISUAL ---
 def render_html(hist, txt, cor, desc):
     js_hist = str(hist)
     return f"""
@@ -54,18 +54,17 @@ def render_html(hist, txt, cor, desc):
     </div>
     """
 
-# --- SIDEBAR E CONFIGS ---
+# --- SIDEBAR ---
 st.sidebar.title("🕹️ CONTROLE")
-# Cole aqui o link da imagem que você me mandou
-url_input = st.sidebar.text_input("Link da Mesa:", "https://maxima.bet.br")
+url_input = st.sidebar.text_input("Link da Mesa:", "https://maxima.bet.br/pb/live-casino/home/-1/All?categoryName=all&openGames=217032-real&gameNames=Football%20Studio")
 ligar = st.sidebar.toggle("LIGAR ROBÔ AGORA")
 
 # Exibição do Painel
 txt, cor, desc = analisar_sinais(st.session_state.historico)
 components.html(render_html(st.session_state.historico, txt, cor, desc), height=250)
 
-# Logs de Debug (Aberto por padrão para você acompanhar)
-with st.expander("🛠️ LOGS DE MONITORAMENTO (DEBUG)", expanded=True):
+# Debug Expander
+with st.expander("🛠️ LOGS DE MONITORAMENTO", expanded=True):
     for log in st.session_state.debug_log:
         st.write(log)
 
@@ -74,32 +73,30 @@ async def capturar_site(url):
     logs = []
     try:
         async with async_playwright() as p:
-            logs.append("🚀 Iniciando navegador modo furtivo...")
-            browser = await p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+            logs.append("🚀 Iniciando motor gráfico...")
+            browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0")
             page = await context.new_page()
             
-            logs.append("🔗 Conectando à mesa...")
-            await page.goto(url, timeout=90000, wait_until="networkidle")
+            logs.append("🔗 Conectando ao servidor da mesa...")
+            await page.goto(url, timeout=60000, wait_until="load")
             
-            logs.append("🔍 Localizando quadro de resultados...")
+            logs.append("🔍 Sincronizando com o histórico...")
+            # Busca frames e elementos de histórico de forma abrangente
             frame = page.frame_locator('iframe').first 
-            
-            # Seletor otimizado para Football Studio
             item = frame.locator('.stats-history-item, [class*="HistoryItem"], [class*="result"]').first
-            await item.wait_for(state="visible", timeout=45000)
             
+            await item.wait_for(state="visible", timeout=30000)
             texto = await item.inner_text()
-            logs.append(f"✅ SUCESSO! Resultado na tela: {texto}")
+            
+            logs.append(f"✅ SUCESSO! Último resultado: {texto}")
             await browser.close()
             
-            # Converte para nosso sistema: Home(P), Away(B), Tie(T)
             if any(h in texto for h in ["H", "Home", "C", "Casa"]): return "P", logs
             if any(a in texto for a in ["A", "Away", "V", "Visitante"]): return "B", logs
             return "T", logs
     except Exception as e:
-        logs.append(f"❌ ERRO: O jogo não respondeu. Verifique o link.")
-        logs.append(f"Detalhe: {str(e)[:50]}")
+        logs.append(f"❌ Falha na sincronização. Tentando novamente...")
         return None, logs
 
 # LOOP DE EXECUÇÃO
@@ -112,7 +109,5 @@ if ligar:
         st.session_state.ultimo_res = res
         st.rerun()
     
-    time.sleep(5) # Espera 5 segundos para a próxima leitura
+    time.sleep(5)
     st.rerun()
-else:
-    st.info("Ative o robô na lateral para começar a monitorar a mesa.")
