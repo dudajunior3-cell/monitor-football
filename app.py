@@ -2,14 +2,16 @@ import streamlit as st
 import asyncio
 import os
 import time
-from playwright.async_api import async_playwright
 
-# 1. Instalação do Navegador
+# 1. AUTO-INSTALAÇÃO DO MOTOR (Playwright)
 if "play_ready" not in st.session_state:
     os.system("playwright install chromium")
     st.session_state.play_ready = True
 
-st.set_page_config(page_title="FOOTBALL STUDIO - AUTO LOGIN", layout="wide")
+from playwright.async_api import async_playwright
+
+# 2. CONFIGURAÇÃO DA PÁGINA
+st.set_page_config(page_title="PAINEL PRO - LOGIN AUTO", layout="wide")
 
 # Inicialização de Memória
 if 'historico' not in st.session_state: st.session_state.historico = []
@@ -17,70 +19,87 @@ if 'logs' not in st.session_state: st.session_state.logs = []
 
 def add_log(msg):
     st.session_state.logs.append(f"[{time.strftime('%H:%M:%S')}] {msg}")
-    if len(st.session_state.logs) > 5: st.session_state.logs.pop(0)
+    if len(st.session_state.logs) > 6: st.session_state.logs.pop(0)
 
 # --- SIDEBAR DE ACESSO ---
 st.sidebar.title("🔐 ACESSO AO CASSINO")
-user = st.sidebar.text_input("Usuário/E-mail:")
+user = st.sidebar.text_input("Usuário/E-mail:", placeholder="seuemail@gmail.com")
 password = st.sidebar.text_input("Senha:", type="password")
-url_login = st.sidebar.text_input("Página de Login:", "https://maxima.bet.br")
+url_base = st.sidebar.text_input("Página de Login:", "https://maxima.bet.br")
 ligar = st.sidebar.toggle("INICIAR ROBÔ COM LOGIN")
 
-# Painel de Status
-with st.expander("🛠️ Console do Robô (Monitoramento)", expanded=True):
-    for log in st.session_state.logs: st.write(log)
+# Exibição do Console de Monitoramento
+st.subheader("🖥️ Console do Robô (Monitoramento)")
+with st.container(border=True):
+    if not st.session_state.logs:
+        st.write("Aguardando comando para iniciar...")
+    for log in st.session_state.logs:
+        st.write(log)
 
-# --- MOTOR DE NAVEGAÇÃO E LOGIN ---
+# --- MOTOR DE NAVEGAÇÃO E LOGIN REFORÇADO ---
 async def iniciar_sessao_e_capturar(u, p, url):
     async with async_playwright() as playwright:
         try:
             add_log("Abrindo navegador furtivo...")
-            browser = await playwright.chromium.launch(headless=True)
+            browser = await playwright.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
             context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0")
             page = await context.new_page()
 
             add_log("Acessando site...")
-            await page.goto(url, timeout=60000)
+            await page.goto(url, timeout=60000, wait_until="networkidle")
 
-            # LÓGICA DE LOGIN (Ajustada para BetConstruct)
+            # LÓGICA DE LOGIN REFORÇADA
             add_log("Tentando realizar login...")
-            # Clica no botão de Login se estiver visível
-            await page.locator('button:has-text("Login"), .login-btn, #login-button').first.click()
             
-            # Digita as credenciais nos campos (seletores comuns)
-            await page.locator('input, input[name="username"]').first.fill(u)
-            await page.locator('input[type="password"]').first.fill(p)
-            await page.locator('button[type="submit"], .submit-btn').first.click()
-            
-            add_log("Aguardando autenticação...")
-            await page.wait_for_timeout(5000) # Espera o login processar
+            # Passo 1: Clicar no botão que abre o formulário
+            try:
+                login_trigger = page.locator('button:has-text("Entrar"), button:has-text("Login"), .login-btn').first
+                await login_trigger.click(timeout=15000)
+                add_log("Formulário de login detectado.")
+            except:
+                add_log("Aviso: Tentando preencher campos diretamente.")
 
-            # NAVEGA PARA O JOGO
+            # Passo 2: Preencher Usuário e Senha (Busca por Placeholder)
+            await page.locator('input[placeholder*="Usuário"], input[placeholder*="E-mail"], input').first.fill(u)
+            await page.locator('input[placeholder*="Senha"], input[type="password"]').first.fill(p)
+            
+            # Passo 3: Clicar no botão de submissão final
+            submit_btn = page.locator('button[type="submit"], button:has-text("Entrar"), .submit-button').last
+            await submit_btn.click()
+            
+            add_log("Credenciais enviadas. Aguardando autenticação...")
+            await page.wait_for_timeout(7000) # Tempo para processar o login
+
+            # Passo 4: Ir para a mesa do jogo
             add_log("Abrindo Football Studio...")
-            # Usamos o link da mesa que você já tem
             await page.goto("https://maxima.bet.brpb/live-casino/home/-1/All?openGames=217032-real", timeout=60000)
             
-            # CAPTURA DO RESULTADO
+            # Passo 5: Captura do Resultado dentro do Iframe
             frame = page.frame_locator('iframe').first
-            item = frame.locator('.stats-history-item, [class*="HistoryItem"]').first
+            item = frame.locator('.stats-history-item, [class*="HistoryItem"], [class*="result"]').first
             await item.wait_for(state="visible", timeout=30000)
             
             res_raw = (await item.inner_text()).upper()
-            add_log(f"✅ SUCESSO! Capturado: {res_raw}")
+            add_log(f"✅ SUCESSO! Resultado: {res_raw}")
             await browser.close()
             
+            # Conversão para o Painel
             if any(x in res_raw for x in ["H", "HOME", "C"]): return "P"
             if any(x in res_raw for x in ["A", "AWAY", "V"]): return "B"
             return "T"
+            
         except Exception as e:
-            add_log(f"❌ Erro: {str(e)[:40]}")
+            add_log(f"❌ Erro: {str(e)[:50]}...")
             return None
 
+# --- LOOP DE EXECUÇÃO ---
 if ligar and user and password:
-    resultado = asyncio.run(iniciar_sessao_e_capturar(user, password, url_login))
+    resultado = asyncio.run(iniciar_sessao_e_capturar(user, password, url_base))
     if resultado:
         if not st.session_state.historico or resultado != st.session_state.historico[-1]:
             st.session_state.historico.append(resultado)
             st.rerun()
-    time.sleep(10) # Intervalo maior para não sobrecarregar o login
+    
+    # Intervalo de 15 segundos para segurança da conta
+    time.sleep(15)
     st.rerun()
