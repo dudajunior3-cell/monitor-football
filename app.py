@@ -46,8 +46,9 @@ def render_ui(hist, txt, cor, desc):
 
 # --- SIDEBAR ---
 st.sidebar.title("🤖 COMANDO DO ROBÔ")
-# Use o link longo que você pegou do jogo aberto
-url_input = st.sidebar.text_input("Link da Mesa:", "https://maxima.bet.br")
+# Use o link longo que aparece no seu navegador da direita
+link_exemplo = "https://maxima.bet.br"
+url_input = st.sidebar.text_input("Link da Mesa:", link_exemplo)
 ligar = st.sidebar.toggle("LIGAR ANÁLISE AO VIVO")
 
 # Exibe o Painel
@@ -59,10 +60,11 @@ async def capturar_ao_vivo(url):
     async with async_playwright() as p:
         try:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page(user_agent="Mozilla/5.0")
+            context = await browser.new_context(user_agent="Mozilla/5.0")
+            page = await context.new_page()
             await page.goto(url, timeout=60000)
             
-            # Procura em todos os frames da página pelo resultado
+            # Varredura em todos os frames para achar o histórico da Evolution
             for frame in page.frames:
                 item = frame.locator('[class*="history-item"], [class*="HistoryItem"], .stats-history-item').first
                 if await item.is_visible(timeout=5000):
@@ -81,7 +83,7 @@ if ligar:
         if res and res != st.session_state.ultimo_res:
             st.session_state.historico.append(res)
             st.session_state.ultimo_res = res
-            st.rerun() # Força a atualização da interface
+            st.rerun() # Força a atualização dos cards
     
-    time.sleep(5) # Espera 5 segundos para a próxima rodada
+    time.sleep(5) 
     st.rerun()
