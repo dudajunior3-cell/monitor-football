@@ -4,15 +4,12 @@ import asyncio
 import time
 from playwright.async_api import async_playwright
 
-# 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="PAINEL PRO - FOOTBALL STUDIO", layout="wide")
 
-# Inicialização de Memória
 if 'historico' not in st.session_state: st.session_state.historico = []
-if 'ultimo_res' not in st.session_state: st.session_state.ultimo_res = ""
 if 'debug_log' not in st.session_state: st.session_state.debug_log = []
 
-# --- ESTRATÉGIA ---
+# --- LÓGICA DE SINAIS ---
 def analisar(hist):
     if len(hist) < 3: return "ANALISANDO MESA...", "#1e293b", "Aguardando 3 rodadas..."
     u = hist[-3:]
@@ -38,11 +35,8 @@ def render(hist, txt, cor, desc):
     </div>
     """
 
-# --- SIDEBAR ---
 st.sidebar.title("🕹️ CONTROLE")
-# Link Sugerido (Mais completo)
-url_padrao = "https://maxima.bet.br"
-url_input = st.sidebar.text_input("Link da Mesa:", url_padrao)
+url_input = st.sidebar.text_input("Link da Mesa:", "COLE_AQUI_O_LINK_LONGO_DA_DIREITA")
 ligar = st.sidebar.toggle("LIGAR ROBÔ AGORA")
 
 txt, cor, desc = analisar(st.session_state.historico)
@@ -51,7 +45,7 @@ components.html(render(st.session_state.historico, txt, cor, desc), height=250)
 with st.expander("🛠️ LOGS DE MONITORAMENTO", expanded=True):
     for log in st.session_state.debug_log: st.write(log)
 
-# --- CAPTURA AVANÇADA ---
+# --- CAPTURA REFORÇADA ---
 async def capturar(url):
     logs = ["🚀 Iniciando motor..."]
     try:
@@ -61,37 +55,33 @@ async def capturar(url):
             page = await context.new_page()
             
             logs.append("🔗 Conectando. Aguardando site carregar...")
-            await page.goto(url, timeout=60000, wait_until="networkidle")
+            await page.goto(url, timeout=60000, wait_until="domcontentloaded")
             
-            # BUSCA PROFUNDA EM TODOS OS QUADROS (IFRAMES)
-            logs.append("🔍 Procurando mesa nos quadros do site...")
+            # Procura em todos os frames por classes de histórico da Evolution
             for frame in page.frames:
                 try:
-                    # Tenta localizar o elemento de histórico por classe ou texto
                     item = frame.locator('[class*="history-item"], [class*="HistoryItem"], .stats-history-item').first
-                    if await item.is_visible(timeout=3000):
-                        texto = await item.inner_text()
-                        t = texto.upper()
-                        logs.append(f"✅ SUCESSO! Resultado: {t}")
+                    if await item.is_visible(timeout=5000):
+                        texto = (await item.inner_text()).upper()
+                        logs.append(f"✅ SUCESSO! Resultado detectado.")
                         await browser.close()
-                        if any(x in t for x in ["H", "HOME", "C", "CASA"]): return "P", logs
-                        if any(x in t for x in ["A", "AWAY", "V", "VISITANTE"]): return "B", logs
+                        if any(x in texto for x in ["H", "HOME", "C"]): return "P", logs
+                        if any(x in texto for x in ["A", "AWAY", "V"]): return "B", logs
                         return "T", logs
                 except: continue
             
             await browser.close()
             logs.append("❌ Falha: Mesa não detectada. Verifique o link.")
             return None, logs
-    except Exception as e:
-        logs.append(f"❌ Erro de conexão.")
-        return None, logs
+    except:
+        return None, ["❌ Erro de conexão."]
 
 if ligar:
     res, n_logs = asyncio.run(capturar(url_input))
     st.session_state.debug_log = n_logs
-    if res and (not st.session_state.historico or res != st.session_state.ultimo_res):
-        st.session_state.historico.append(res)
-        st.session_state.ultimo_res = res
-        st.rerun()
+    if res:
+        if not st.session_state.historico or res != st.session_state.historico[-1]:
+            st.session_state.historico.append(res)
+            st.rerun()
     time.sleep(5)
     st.rerun()
