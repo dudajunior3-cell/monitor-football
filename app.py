@@ -56,14 +56,16 @@ def render_html(hist, txt, cor, desc):
 
 # --- SIDEBAR ---
 st.sidebar.title("🕹️ CONTROLE")
-url_input = st.sidebar.text_input("Link da Mesa:", "https://maxima.bet.br/pb/live-casino/home/-1/All?categoryName=all&openGames=217032-real&gameNames=Football%20Studio")
+# Link direto que você forneceu
+url_padrao = "https://maxima.bet.br"
+url_input = st.sidebar.text_input("Link da Mesa:", url_padrao)
 ligar = st.sidebar.toggle("LIGAR ROBÔ AGORA")
 
 # Exibição do Painel
 txt, cor, desc = analisar_sinais(st.session_state.historico)
 components.html(render_html(st.session_state.historico, txt, cor, desc), height=250)
 
-# Debug Expander
+# Debug Expander (Logs de Monitoramento)
 with st.expander("🛠️ LOGS DE MONITORAMENTO", expanded=True):
     for log in st.session_state.debug_log:
         st.write(log)
@@ -74,26 +76,31 @@ async def capturar_site(url):
     try:
         async with async_playwright() as p:
             logs.append("🚀 Iniciando motor gráfico...")
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
             context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0")
             page = await context.new_page()
             
             logs.append("🔗 Conectando ao servidor da mesa...")
-            await page.goto(url, timeout=60000, wait_until="load")
+            await page.goto(url, timeout=90000, wait_until="networkidle")
             
             logs.append("🔍 Sincronizando com o histórico...")
-            # Busca frames e elementos de histórico de forma abrangente
+            # Localiza o iframe do jogo
             frame = page.frame_locator('iframe').first 
-            item = frame.locator('.stats-history-item, [class*="HistoryItem"], [class*="result"]').first
             
-            await item.wait_for(state="visible", timeout=30000)
+            # Seletor aprimorado para capturar os resultados (Home, Away ou Tie)
+            item = frame.locator('[class*="history"], [class*="History"], [class*="result"], .stats-history-item').first
+            
+            # Espera o elemento ficar visível na tela
+            await item.wait_for(state="visible", timeout=45000)
             texto = await item.inner_text()
             
-            logs.append(f"✅ SUCESSO! Último resultado: {texto}")
+            logs.append(f"✅ SUCESSO! Resultado capturado.")
             await browser.close()
             
-            if any(h in texto for h in ["H", "Home", "C", "Casa"]): return "P", logs
-            if any(a in texto for a in ["A", "Away", "V", "Visitante"]): return "B", logs
+            # Normalização dos resultados para o sistema interno
+            texto = texto.upper()
+            if any(h in texto for h in ["H", "HOME", "C", "CASA"]): return "P", logs
+            if any(a in texto for a in ["A", "AWAY", "V", "VISITANTE"]): return "B", logs
             return "T", logs
     except Exception as e:
         logs.append(f"❌ Falha na sincronização. Tentando novamente...")
@@ -109,5 +116,7 @@ if ligar:
         st.session_state.ultimo_res = res
         st.rerun()
     
-    time.sleep(5)
+    time.sleep(5) # Intervalo entre as checagens
     st.rerun()
+else:
+    st.info("Ative o robô no menu lateral para iniciar.")
